@@ -1,0 +1,6 @@
+framework module Pods_scanlanbt {
+  umbrella header "Pods-scanlanbt-umbrella.h"
+
+  export *
+  module * { export * }
+}
