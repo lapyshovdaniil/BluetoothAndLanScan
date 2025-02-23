@@ -8,41 +8,63 @@ import SwiftUI
 
 struct ScanHistoryView: View {
     @Binding var selectedTab: Int
-    let lanDevices: [DeviceInfo] = DeviceDatabaseManager.shared.fetchLANDevices()  // Выгрузка LAN устройств
-    let bluetoothDevices: [BluetoothDevice] = DeviceDatabaseManager.shared.fetchBluetoothDevices()  // Выгрузка Bluetooth устройств
+    @ObservedObject var viewModel = ScanHistoryViewModel()
+    
+    @State private var showingAlert = false
     
     var body: some View {
         NavigationView {
-            List {
-                Section(header: Text("LAN устройства")) {
-                    ForEach(lanDevices) { device in
-                        VStack(alignment: .leading) {
-                            Text(device.deviceName ?? "Неизвестное устройство")
-                                .font(.headline)
-                            Text("IP: \(device.ipAddress)")
-                            if let macAddress = device.macAddress {
-                                Text("MAC: \(macAddress)")
-                            } else {
-                                Text("MAC-адрес не указан")
+            VStack {
+                List {
+                    Section(header: Text("LAN устройства")) {
+                        ForEach(viewModel.lanDevices) { device in
+                            VStack(alignment: .leading) {
+                                Text(device.deviceName ?? "Неизвестное устройство")
+                                    .font(.headline)
+                                Text("IP: \(device.ipAddress)")
+                                if let macAddress = device.macAddress {
+                                    Text("MAC: \(macAddress)")
+                                } else {
+                                    Text("MAC-адрес не указан")
+                                }
                             }
+                            .padding()
                         }
-                        .padding()
                     }
-                }
-                
-                Section(header: Text("Bluetooth устройства")) {
-                    ForEach(bluetoothDevices) { device in
-                        VStack(alignment: .leading) {
-                            Text(device.name)
-                                .font(.headline)
-                            Text("UUID: \(device.uuid)")
-                            Text("RSSI: \(device.rssi)")
+                    
+                    Section(header: Text("Bluetooth устройства")) {
+                        ForEach(viewModel.bluetoothDevices) { device in
+                            VStack(alignment: .leading) {
+                                Text(device.name)
+                                    .font(.headline)
+                                Text("UUID: \(device.uuid)")
+                                Text("RSSI: \(device.rssi)")
+                            }
+                            .padding()
                         }
-                        .padding()
                     }
                 }
             }
-            .navigationTitle("Сканирование устройств")
+            .navigationBarTitle("Scanned Devices", displayMode: .inline)
+            .navigationBarItems(trailing: Button(action: {
+                showingAlert = true
+            }) {
+                Image(systemName: "trash")
+                    .foregroundColor(.red)
+            })
+            .alert(isPresented: $showingAlert) {
+                Alert(
+                    title: Text("Очистить историю?"),
+                    message: Text("Вы уверены, что хотите очистить все устройства из истории?"),
+                    primaryButton: .destructive(Text("Да")) {
+                        viewModel.clearAllDevices()
+                    },
+                    secondaryButton: .cancel(Text("Нет"))
+                )
+            }
+            .onAppear {
+                viewModel.loadDevices()
+            }
         }
     }
 }

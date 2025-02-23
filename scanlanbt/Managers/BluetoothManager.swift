@@ -8,13 +8,17 @@ import CoreBluetooth
 import SwiftUI
 
 class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeripheralDelegate {
+    
     var centralManager: CBCentralManager!
     var connectedPeripheral: CBPeripheral?
     
     @Published var alert: AlertData?
     @Published var discoveredDevices: [BluetoothDevice] = []
     @Published var isScanningBt: Bool = false
+    @Published var progress: CGFloat = 0.0
+    
     private var scanCompleted = false
+    private var timer: Timer?
     
     override init() {
         super.init()
@@ -25,17 +29,28 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
         if centralManager.state == .poweredOn {
             isScanningBt = true
             scanCompleted = false
+            progress = 0.0
             centralManager.scanForPeripherals(withServices: nil, options: nil)
+            
+            timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                if self.progress >= 1.0 {
+                    self.stopScanning()
+                } else {
+                    self.progress += 0.1 / 15.0
+                }
+            }
         } else {
             showBluetoothOffAlert()
         }
     }
     
-    
     func stopScanning() {
         DeviceDatabaseManager.shared.saveBluetoothDevices(discoveredDevices)
         isScanningBt = false
         centralManager.stopScan()
+        timer?.invalidate()
+        progress = 0.0
         
         if !scanCompleted {
             showScanCompletionAlert()
@@ -46,7 +61,7 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
     // Обновляем список каждые 3 секунды
     func updateDevices() {
         Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
-            self.objectWillChange.send() 
+            self.objectWillChange.send()
         }
     }
     
@@ -95,22 +110,22 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
         }
         centralManager.connect(peripheral, options: nil)
     }
-    // Успешное подключение
+    
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         connectedPeripheral = peripheral
         peripheral.delegate = self
         peripheral.discoverServices(nil)
     }
-    // Метод для показа алерта по завершении сканирования
+    
     private func showScanCompletionAlert() {
         let deviceCount = discoveredDevices.count
-        scanCompleted = true // Устанавливаем флаг завершения сканирования
+        scanCompleted = true
         self.alert = AlertData(
             title: "Сканирование завершено!",
             message: "Найдено \(deviceCount) Bluetooth устройств."
         )
     }
-    // Метод для показа алерта, если Bluetooth выключен
+    
     private func showBluetoothOffAlert() {
         self.alert = AlertData(
             title: "Bluetooth выключен",
@@ -118,4 +133,5 @@ class BluetoothManager: NSObject, ObservableObject, CBCentralManagerDelegate, CB
         )
     }
 }
+
 

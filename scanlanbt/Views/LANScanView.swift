@@ -9,9 +9,6 @@ import SwiftUI
 struct LANScanView: View {
     @Binding var selectedTab: Int
     @StateObject private var networkScanner = NetworkScanner()
-    @State private var progress: CGFloat = 0.0
-    @State private var isTimerRunning = false
-    @State private var timer: Timer?
     
     var body: some View {
         NavigationView {
@@ -31,21 +28,22 @@ struct LANScanView: View {
                 HStack {
                     Button(action: {
                         if networkScanner.isScanningLan {
-                            stopScanning()
+                            networkScanner.stopScan()
                         } else {
-                            startScanning()
+                            networkScanner.startScan()
                         }
                     }) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(Color.green)
                             
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color.red)
-                                .frame(width: nil, height: nil)
-                                .scaleEffect(x: progress, y: 1, anchor: .leading)
-                                .animation(.linear(duration: 0.1), value: progress)
-                            
+                            if networkScanner.isConnectedToNetwork {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.red)
+                                    .frame(width: nil, height: nil)
+                                    .scaleEffect(x: networkScanner.progress, y: 1, anchor: .leading)
+                                    .animation(.linear(duration: 0.1), value: networkScanner.progress)
+                            }
                             Text(networkScanner.isScanningLan ? "Остановить сканирование" : "Начать сканирование")
                                 .foregroundColor(.white)
                                 .padding()
@@ -64,28 +62,6 @@ struct LANScanView: View {
             Alert(title: Text(alert.title), message: Text(alert.message), dismissButton: .default(Text("OK")))
         }
     }
-    func startScanning() {
-        networkScanner.startScan()
-        networkScanner.updateDevices()
-        isTimerRunning = true
-        progress = 0.0
-        
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-            if self.progress >= 1.0 {
-                self.stopScanning()
-            } else {
-                self.progress += 0.1 / 15.0
-            }
-        }
-    }
-    
-    func stopScanning() {
-        networkScanner.stopScan()
-        timer?.invalidate()
-        isTimerRunning = false
-        progress = 0.0
-    }
 }
-
 
 

@@ -123,4 +123,31 @@ class DeviceDatabaseManager {
         }
         return devices
     }
+    
+    func clearDevices(from table: String) {
+         do {
+             let delete: Table
+             // Выбор таблицы для очистки
+             if table == "bluetooth_devices" {
+                 delete = bluetoothTable
+             } else if table == "lan_devices" {
+                 delete = lanTable
+             } else {
+                 print("Неизвестная таблица: \(table)")
+                 return
+             }
+             
+             // Удаление всех записей из выбранной таблицы
+             let deleteQuery = delete.delete()
+             try db?.run(deleteQuery)
+             print("Все данные удалены из таблицы \(table).")
+         } catch {
+             print("Ошибка при удалении данных из таблицы \(table): \(error)")
+         }
+     }
+    
+     func clearAllDevices() {
+         clearDevices(from: "bluetooth_devices")
+         clearDevices(from: "lan_devices")
+     }
 }

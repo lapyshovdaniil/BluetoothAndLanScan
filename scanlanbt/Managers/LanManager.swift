@@ -9,15 +9,17 @@ import MMLanScan
 import Network
 
 class NetworkScanner: NSObject, MMLANScannerDelegate, ObservableObject {
+    
     @Published var alert: AlertData?
     @Published var isScanningLan: Bool = false
-    var lanScanner: MMLANScanner!
+    @Published var progress: CGFloat = 0.0
+    @Published var isConnectedToNetwork: Bool = false
+    @Published var devices: [DeviceInfo] = []
     
     private var monitor: NWPathMonitor?
-    private var isConnectedToNetwork: Bool = false
+    private var timer: Timer?
     
-    
-    @Published var devices: [DeviceInfo] = []
+    var lanScanner: MMLANScanner!
     
     
     override init() {
@@ -25,7 +27,9 @@ class NetworkScanner: NSObject, MMLANScannerDelegate, ObservableObject {
         lanScanner = MMLANScanner(delegate: self)
         monitor = NWPathMonitor()
         monitor?.pathUpdateHandler = { path in
-            self.isConnectedToNetwork = path.status == .satisfied
+            DispatchQueue.main.async {
+                self.isConnectedToNetwork = path.status == .satisfied
+            }
         }
         
         let queue = DispatchQueue(label: "NetworkMonitor")
@@ -37,23 +41,36 @@ class NetworkScanner: NSObject, MMLANScannerDelegate, ObservableObject {
     }
     
     func startScan() {
+        guard isConnectedToNetwork else {
+            showNoNetworkAlert()
+            return
+        }
+        
         isScanningLan = true
+        progress = 0.0
         lanScanner.start()
+        
+        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            if self.progress >= 1.0 {
+                self.stopScan()
+            } else {
+                self.progress += 0.1 / 15.0
+            }
+        }
     }
     
     func stopScan() {
         DeviceDatabaseManager.shared.saveLANDevices(devices)
         isScanningLan = false
+        timer?.invalidate()
+        progress = 0.0
         showScanCompletionAlert()
         lanScanner.stop()
         devices.removeAll()
     }
     
-    // MARK: - MMLANScannerDelegate
-    
     func lanScanDidFindNewDevice(_ device: MMDevice!) {
         DispatchQueue.main.async {
-            // Добавляем найденное устройство в список
             let newDevice = DeviceInfo(
                 ipAddress: device.ipAddress ?? "Unknown",
                 macAddress: device.macAddress ?? "Unknown",
@@ -71,8 +88,8 @@ class NetworkScanner: NSObject, MMLANScannerDelegate, ObservableObject {
     
     func lanScanProgressPinged(_ pingedHosts: Float, from overallHosts: Int) {
         DispatchQueue.main.async {
-            let progress = (pingedHosts / Float(overallHosts)) * 100
-            print("Прогресс сканирования: \(progress)%")
+            let progressValue = (pingedHosts / Float(overallHosts)) * 100
+            print("Прогресс сканирования: \(progressValue)%")
         }
     }
     
@@ -82,11 +99,15 @@ class NetworkScanner: NSObject, MMLANScannerDelegate, ObservableObject {
             print("Ошибка при сканировании сети")
         }
     }
+    
     private func showScanCompletionAlert() {
         self.alert = AlertData(title: "Сканирование завершено!", message: "Найдено \(devices.count) устройств.")
     }
     
     private func showNoNetworkAlert() {
+        timer?.invalidate()
+        isScanningLan = false
         self.alert = AlertData(title: "Нет подключения к сети", message: "Подключитесь к сети для выполнения сканирования.")
     }
 }
+
